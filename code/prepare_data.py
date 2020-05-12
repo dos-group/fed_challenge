@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import sqlite3 as lite
+import argparse
 
 
 def get_time_range(con):
@@ -46,16 +47,25 @@ def test(index):
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--n_splits", type=int, default=20, help="Number of splits.")
+    parser.add_argument("--split_limit", type=int, default=-1, help="Limit the number of splits that are stored in "
+                                                                    "database files. Can be used for fast testing.")
+    args = parser.parse_args()
+
     con = lite.connect('../data/series.db')
     min_t, max_t = get_time_range(con)
 
     ids_q = 'select distinct ID from FedCSIS'
     ids = pd.read_sql_query(ids_q, con)
 
-    split_factor = 10000
-    splits = np.array_split(ids, split_factor)
+    n_splits = args.n_splits
+    splits = np.array_split(ids, n_splits)
 
-    splits = splits[-2:]
+    split_limit = args.split_limit
+
+    if split_limit > 0:
+        splits = splits[-split_limit:]
 
     for i, split in enumerate(splits):
         print("####### Processing split {} of {} (Length {} elements) #######".format(i + 1, len(splits), len(split)))
@@ -65,7 +75,6 @@ def main():
             data_id = row.ID
             df = read_from_db(con, data_id, min_t, max_t)
             write_to_db(df, i)
-
     con.close()
 
 

@@ -119,7 +119,7 @@ def get_data(data, w_size, offset_start, offset_end, batch_size=10):
     return dataset, dataloader
 
 
-def train_models(train_data, w_size, offset_indices, epochs=10):
+def train_models(train_data, w_size, offset_indices, device, epochs):
     start = time.time()
     models = {}
     for s, e in offset_indices:
@@ -131,15 +131,15 @@ def train_models(train_data, w_size, offset_indices, epochs=10):
         model = Model(train_dataset.get_input_len(), train_dataset.get_output_len())
         optimizer = torch.optim.Adam(model.parameters(), lr=0.00001)
         criterion = nn.L1Loss()
-        model.cpu()
+        model.to(device)
         model.train()
 
         for e in range(epochs):
             total_loss = 0.0
             for i, batch in enumerate(train_dataloader):
                 b_input, b_labels = batch
-                out = model.forward(b_input.cpu())
-                loss = criterion(out, b_labels.cpu())
+                out = model.forward(b_input.to(device))
+                loss = criterion(out, b_labels.to(device))
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(model.parameters(), 0.2)
                 optimizer.step()
@@ -155,13 +155,13 @@ def train_models(train_data, w_size, offset_indices, epochs=10):
     return models
 
 
-def predict(models, data_in):
+def predict(models, data_in, device):
     input_data = torch.tensor(data_in.flatten()).float()
 
     results = []
     for offset, model in models.items():
         model.eval()
-        out = model.forward(input_data.cpu())
+        out = model.forward(input_data.to(device))
         results.append(out.cpu().detach().numpy())
     results = np.concatenate(results, axis=None)
 
@@ -221,7 +221,7 @@ def run_test(test_data, models, n_input, min_values, max_values):
     return result_loss, baseline_loss
 
 
-def run(index, n_forecast, chunk_size, n_input, epochs=10, run_with_test=False, iteration_limit=-1):
+def run(index, n_forecast, chunk_size, n_input, epochs=10, run_with_test=False, iteration_limit=-1, device='cpu'):
     con = lite.connect('../data/series_{}.db'.format(index))
 
     ids_q = 'select distinct ID from FedCSIS'
@@ -282,6 +282,7 @@ def main():
                                                             "If set, tail of dataset will be used as test set.")
     parser.add_argument("--series_limit", type=int, default=-1, help="Number of series to process. Can be used for"
                                                                      "testing to prevent to run over all series.")
+    parser.add_argument("--device", type=str, default='cpu', help="Device to run on.")  # cuda:0, cpu
     args = parser.parse_args()
 
     index = args.index
@@ -291,8 +292,9 @@ def main():
     epochs = args.epochs
     test = args.test
     series_limit = args.series_limit
+    device = args.device
 
-    run(index, n_forecast, chunk_size, n_input, epochs, test, series_limit)
+    run(index, n_forecast, chunk_size, n_input, epochs, test, series_limit, device)
 
 
 if __name__ == "__main__":
