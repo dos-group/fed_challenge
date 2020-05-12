@@ -111,22 +111,22 @@ class Model(nn.Module):
         return o
 
 
-def get_data(data, w_size, offset_start, offset_end, batch_size=10):
-    dataset = CrazyDataset(data, w_size, offset_start, offset_end)
+def get_data(data, n_input, offset_start, offset_end, batch_size=10):
+    dataset = CrazyDataset(data, n_input, offset_start, offset_end)
     sampler = RandomSampler(dataset, replacement=True, num_samples=500)
     dataloader = DataLoader(dataset, sampler=sampler, batch_size=batch_size)
 
     return dataset, dataloader
 
 
-def train_models(train_data, w_size, offset_indices, device, epochs):
+def train_models(train_data, n_input, offset_indices, device, epochs):
     start = time.time()
     models = {}
     for s, e in offset_indices:
         print('######### Training offsets {} - {} #########'.format(s, e))
         torch.random.seed = s
 
-        train_dataset, train_dataloader = get_data(train_data, w_size, s, e)
+        train_dataset, train_dataloader = get_data(train_data, n_input, s, e)
 
         model = Model(train_dataset.get_input_len(), train_dataset.get_output_len())
         optimizer = torch.optim.Adam(model.parameters(), lr=0.00001)
@@ -251,11 +251,11 @@ def run(index, n_forecast, chunk_size, n_input, epochs=10, run_with_test=False, 
             train_data = df.to_numpy()
             train_data, min_values, max_values = min_max_scale(train_data)
 
-        models = train_models(train_data, n_input, offset_indices, epochs=epochs)
+        models = train_models(train_data, n_input, offset_indices, device, epochs)
 
         if not run_with_test:
             input_data = train_data[-n_input:]
-            results = predict(models, input_data)
+            results = predict(models, input_data, device)
             results_o = inv_min_max_scale(results, min_values[0], max_values[0])
             submission_results[(host, series)] = results_o
 
