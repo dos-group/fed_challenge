@@ -4,18 +4,6 @@ import sqlite3 as lite
 import argparse
 
 
-def get_time_range(con):
-    # Get min and max time of dataset to get complete time range
-    min_max_time_q = 'select MIN(time_window) as min_t, MAX(time_window) as max_t from FedCSIS'
-    min_max_df = pd.read_sql_query(min_max_time_q, con)
-    min_max_df['min_t'] = pd.to_datetime(min_max_df['min_t'], format='%Y-%m-%dT%H:%M:%SZ')
-    min_max_df['max_t'] = pd.to_datetime(min_max_df['max_t'], format='%Y-%m-%dT%H:%M:%SZ')
-    min_t = min_max_df.iloc[0].min_t
-    max_t = min_max_df.iloc[0].max_t
-
-    return min_t, max_t
-
-
 def read_from_db(con, data_id, min_t, max_t):
     host, series = data_id.split('#')
     query = 'select * from FedCSIS where ID="{}"'.format(data_id)
@@ -49,12 +37,11 @@ def test(index):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--n_splits", type=int, default=20, help="Number of splits.")
-    parser.add_argument("--split_limit", type=int, default=-1, help="Limit the number of splits that are stored in "
-                                                                    "database files. Can be used for fast testing.")
+
     args = parser.parse_args()
 
     con = lite.connect('../data/series.db')
-    min_t, max_t = get_time_range(con)
+    # min_t, max_t = get_time_range(con)
 
     ids_q = 'select distinct ID from FedCSIS'
     ids = pd.read_sql_query(ids_q, con)
@@ -62,19 +49,15 @@ def main():
     n_splits = args.n_splits
     splits = np.array_split(ids, n_splits)
 
-    split_limit = args.split_limit
-
-    if split_limit > 0:
-        splits = splits[-split_limit:]
-
     for i, split in enumerate(splits):
         print("####### Processing split {} of {} (Length {} elements) #######".format(i + 1, len(splits), len(split)))
-        for j, (_, row) in enumerate(split.iterrows()):
-            if j % 10 == 0 and j != 0:
-                print('... Processing entry {} of {} ...'.format(j, len(split)))
-            data_id = row.ID
-            df = read_from_db(con, data_id, min_t, max_t)
-            write_to_db(df, i)
+        split.to_csv("../data/data_ids_{}.csv".format(i))
+        # for j, (_, row) in enumerate(split.iterrows()):
+        #     if j % 10 == 0 and j != 0:
+        #         print('... Processing entry {} of {} ...'.format(j, len(split)))
+        #     data_id = row.ID
+        #     df = read_from_db(con, data_id, min_t, max_t)
+        #     write_to_db(df, i)
     con.close()
 
 

@@ -11,11 +11,26 @@ from torch.utils.data import DataLoader, RandomSampler
 from sklearn.metrics import r2_score
 
 
-def get_dataframe(con, data_id):
+def get_time_range(con):
+    # Get min and max time of dataset to get complete time range
+    min_max_time_q = 'select MIN(time_window) as min_t, MAX(time_window) as max_t from FedCSIS'
+    min_max_df = pd.read_sql_query(min_max_time_q, con)
+    min_max_df['min_t'] = pd.to_datetime(min_max_df['min_t'], format='%Y-%m-%dT%H:%M:%SZ')
+    min_max_df['max_t'] = pd.to_datetime(min_max_df['max_t'], format='%Y-%m-%dT%H:%M:%SZ')
+    min_t = min_max_df.iloc[0].min_t
+    max_t = min_max_df.iloc[0].max_t
+
+    return min_t, max_t
+
+
+def get_dataframe(con, data_id, min_t, max_t):
     query = 'select * from FedCSIS where ID="{}"'.format(data_id)
-    df = pd.read_sql_query(query, con)
-    print(df.columns)
-    df = df.set_index('index')
+    df = pd.read_sql_query(query, con).drop(['index'], axis=1)
+    df['time_window'] = pd.to_datetime(df['time_window'], format='%Y-%m-%dT%H:%M:%SZ')
+
+    new_index = pd.date_range(min_t, max_t, freq='1H')
+    df = df.set_index('time_window')
+    df = df.reindex(new_index, fill_value=np.nan)
     df = df.drop(['hostname', 'series', 'ID'], axis=1)
     return df
 
@@ -222,11 +237,8 @@ def run_test(test_data, models, n_input, min_values, max_values):
 
 
 def run(index, n_forecast, chunk_size, n_input, epochs=10, run_with_test=False, iteration_limit=-1, device='cpu'):
-    con = lite.connect('../data/series_{}.db'.format(index))
-
-    ids_q = 'select distinct ID from FedCSIS'
-    ids = pd.read_sql_query(ids_q, con)
-
+    con = lite.connect('../data/series.db')
+    ids = pd.read_csv('../data/data_ids_{}.csv'.format(index))
     offset_indices = [(i - chunk_size, i) for i in range(0, n_forecast + 1, chunk_size)][1:]
 
     submission_results = {}
@@ -242,7 +254,8 @@ def run(index, n_forecast, chunk_size, n_input, epochs=10, run_with_test=False, 
         print('#### Processing series {} out of {} (hostname: {}, series name: {} ###'.format(i + 1, len(ids), host,
                                                                                               series))
 
-        df = get_dataframe(con, data_id)
+        min_t, max_t = get_time_range(con)
+        df = get_dataframe(con, data_id, min_t, max_t)
         df = interpolate(df)
 
         if run_with_test:
