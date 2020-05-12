@@ -177,7 +177,7 @@ def get_test_train_data(df, n_forecast, n_input):
     train_data, min_values, max_values = min_max_scale(train_data)
     test_data, _, _ = min_max_scale(test_data, min_values=min_values, max_values=max_values)
 
-    return train_data, test_data
+    return train_data, test_data, min_values, max_values
 
 
 def generate_submission_results(submission_results):
@@ -246,7 +246,7 @@ def run(index, n_forecast, chunk_size, n_input, epochs=10, run_with_test=False, 
         df = interpolate(df)
 
         if run_with_test:
-            train_data, test_data = get_test_train_data(df, n_forecast, n_input)
+            train_data, test_data, min_values, max_values = get_test_train_data(df, n_forecast, n_input)
         else:
             train_data = df.to_numpy()
             train_data, min_values, max_values = min_max_scale(train_data)
