@@ -1,22 +1,17 @@
 import pandas as pd
 import numpy as np
 import sqlite3 as lite
-import sys
 import argparse
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-import math
 import time
-from torch.autograd import Variable
 from torch.utils.data import Dataset
-from torch.utils.data import TensorDataset, DataLoader, RandomSampler, SequentialSampler, WeightedRandomSampler
+from torch.utils.data import DataLoader, RandomSampler
 from sklearn.metrics import r2_score
 
 
-
-def get_dataframe(data_id):
+def get_dataframe(con, data_id):
     query = 'select * from FedCSIS where ID="{}"'.format(data_id)
     df = pd.read_sql_query(query, con)
     print(df.columns)
@@ -236,11 +231,18 @@ def run(index, n_forecast, chunk_size, n_input, epochs=10, run_with_test=False, 
 
     submission_results = {}
     for i, (index, row) in enumerate(ids.iterrows()):
+        if iteration_limit > 0 and iteration_limit == i:
+            print('Iteration limit {} reached. Aborting...'.format(iteration_limit))
+            break
+
         data_id = row.ID
         # Series and host
         host, series = data_id.split('#')
 
-        df = get_dataframe(data_id)
+        print('#### Processing series {} out of {} (hostname: {}, series name: {} ###'.format(i + 1, len(ids), host,
+                                                                                              series))
+
+        df = get_dataframe(con, data_id)
         df = interpolate(df)
 
         if run_with_test:
