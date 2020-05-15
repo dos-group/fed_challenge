@@ -164,10 +164,10 @@ def run(start=0, end=10000, epochs=6, device=0):
         losses = train_models(model, data_id_test, train_data, epochs=epochs, device=device)
 
         max_iter = 10
-        while len(set(losses)) < 2 and max_iter > 0:
+        while len(set(losses)) < 3 and max_iter > 0:
             print("--------------------------> Nothing learned !!! ------------> try again xD")
             model = Model(len(train_data[0][0]), len(train_data[0][1]))
-            losses = train_models(model, train_data, epochs=epochs, device=device)
+            losses = train_models(model, data_id_test, train_data, epochs=epochs, device=device)
             max_iter -= 1
 
         # test
