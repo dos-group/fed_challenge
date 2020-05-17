@@ -55,7 +55,9 @@ def min_max_scale(data, min_values=None, max_values=None):
     denom[denom == 0] = 1  # Prevent division by 0
     scaled_data = target_min + nom / denom
 
-    return scaled_data, min_values, max_values
+    const = data[0][0] if min_values[0] == max_values[0] else -1
+
+    return const, scaled_data, min_values, max_values
 
 
 def inv_min_max_scale(data, min_values, max_values):
@@ -189,10 +191,10 @@ def get_test_train_data(df, n_forecast, n_input):
 
     train_data = df.to_numpy()[:-test_data_size]
 
-    train_data, min_values, max_values = min_max_scale(train_data)
-    test_data, _, _ = min_max_scale(test_data, min_values=min_values, max_values=max_values)
+    const, train_data, min_values, max_values = min_max_scale(train_data)
+    _, test_data, _, _ = min_max_scale(test_data, min_values=min_values, max_values=max_values)
 
-    return train_data, test_data, min_values, max_values
+    return const, train_data, test_data, min_values, max_values
 
 
 def generate_submission_results(submission_results):
@@ -259,23 +261,25 @@ def run(index, n_forecast, chunk_size, n_input, epochs=10, run_with_test=False, 
         df = interpolate(df)
 
         if run_with_test:
-            train_data, test_data, min_values, max_values = get_test_train_data(df, n_forecast, n_input)
+            const, train_data, test_data, min_values, max_values = get_test_train_data(df, n_forecast, n_input)
         else:
             train_data = df.to_numpy()
-            train_data, min_values, max_values = min_max_scale(train_data)
+            const, train_data, min_values, max_values = min_max_scale(train_data)
 
-        models = train_models(train_data, n_input, offset_indices, device, epochs)
-
-        if not run_with_test:
-            input_data = train_data[-n_input:]
-            results = predict(models, input_data, device)
-            results_o = inv_min_max_scale(results, min_values[0], max_values[0])
+        if const > -1:
+            models = train_models(train_data, n_input, offset_indices, device, epochs)
+            if not run_with_test:
+                input_data = train_data[-n_input:]
+                results = predict(models, input_data, device)
+                results_o = inv_min_max_scale(results, min_values[0], max_values[0])
+                submission_results[(host, series)] = results_o
+            if run_with_test:
+                result_loss, baseline_loss = run_test(test_data, models, n_input, min_values, max_values)
+                print("Result: {}".format(result_loss))
+                print("Baseline Result: {}".format(baseline_loss))
+        else:
+            results = np.full(n_forecast, const)
             submission_results[(host, series)] = results_o
-
-        if run_with_test:
-            result_loss, baseline_loss = run_test(test_data, models, n_input, min_values, max_values)
-            print("Result: {}".format(result_loss))
-            print("Baseline Result: {}".format(baseline_loss))
 
     if not run_with_test:
         submission_results_df = generate_submission_results(submission_results)
