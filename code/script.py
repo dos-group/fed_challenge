@@ -110,16 +110,16 @@ class Model(nn.Module):
         super(Model, self).__init__()
 
         self.lin1 = nn.Linear(input_len, input_len * 2)
-        self.lin2 = nn.Linear(input_len * 2, input_len * 4)
-        self.lin3 = nn.Linear(input_len * 4, input_len * 2)
+        #self.lin2 = nn.Linear(input_len * 2, input_len * 4)
+        #self.lin3 = nn.Linear(input_len * 4, input_len * 2)
         self.lin4 = nn.Linear(input_len * 2, input_len)
         self.lin_out = nn.Linear(input_len, output_len)
 
     def forward(self, x):
         o = x
         o = self.lin1(o)
-        o = self.lin2(o)
-        o = self.lin3(o)
+        #o = self.lin2(o)
+        #o = self.lin3(o)
         o = self.lin4(o)
         o = self.lin_out(o)
 
@@ -162,6 +162,7 @@ def train_models(train_data, n_input, offset_indices, device, epochs):
                 total_loss += loss.item()  # r2_score(b_labels.cpu().detach().numpy(), out.cpu().detach().numpy())
             if e % 3 == 0:
                 print("Epoch {} loss: {:.6f}".format(e, total_loss / len(train_dataloader)))
+        model.cpu()
         models[s] = model
 
     end = time.time()
@@ -171,13 +172,15 @@ def train_models(train_data, n_input, offset_indices, device, epochs):
 
 
 def predict(models, data_in, device):
-    input_data = torch.tensor(data_in.flatten()).float()
+    input_data = torch.tensor(data_in.flatten()).float().to(device)
 
     results = []
     for offset, model in models.items():
+        model.to(device)
         model.eval()
-        out = model.forward(input_data.to(device))
+        out = model.forward(input_data)
         results.append(out.cpu().detach().numpy())
+        model.cpu()
     results = np.concatenate(results, axis=None)
 
     return results
@@ -207,18 +210,11 @@ def generate_submission_results(submission_results):
     return submission_results_df
 
 
-def run_test(test_data, models, n_input, min_values, max_values):
+def run_test(test_data, models, n_input, min_values, max_values, device):
     test_in = test_data[-n_input:]
     test_out = test_data[:-n_input]
 
-    input_data = torch.tensor(test_in.flatten()).float()
-
-    results = []
-    for offset, model in models.items():
-        model.eval()
-        out = model.forward(input_data.cuda())
-        results.append(out.cpu().detach().numpy())
-    results = np.concatenate(results, axis=None)
+    results = predict(models, test_in, device)
 
     value = test_in[len(test_in) - 1, 0]
     baseline_result = np.zeros(len(test_out))
@@ -240,24 +236,29 @@ def run(index, n_forecast, chunk_size, n_input, epochs=10, run_with_test=False, 
     con = lite.connect('../data/series.db')
     ids = pd.read_csv('../data/data_ids_{}.csv'.format(index))
     offset_indices = [(i - chunk_size, i) for i in range(0, n_forecast + 1, chunk_size)][1:]
-
+    
+    min_t, max_t = get_time_range(con)
+     
     submission_results = {}
-    for i, (index, row) in enumerate(ids.iterrows()):
+    for i, (_, row) in enumerate(ids.iterrows()):
         if iteration_limit > 0 and iteration_limit == i:
             print('Iteration limit {} reached. Aborting...'.format(iteration_limit))
             break
-
+            
+        if iteration_limit > 0 and iteration_limit == i:
+            print('Iteration limit {} reached. Aborting...'.format(iteration_limit))
+            break
+        
         data_id = row.ID
+        df = get_dataframe(con, data_id, min_t, max_t)
+        df = interpolate(df)
+
+        #data_id = row.ID
         # Series and host
         host, series = data_id.split('#')
 
         print('#### Processing series {} out of {} (hostname: {}, series name: {} ###'.format(i + 1, len(ids), host,
                                                                                               series))
-
-        min_t, max_t = get_time_range(con)
-        df = get_dataframe(con, data_id, min_t, max_t)
-        df = interpolate(df)
-
         if run_with_test:
             train_data, test_data, min_values, max_values = get_test_train_data(df, n_forecast, n_input)
         else:
@@ -273,7 +274,7 @@ def run(index, n_forecast, chunk_size, n_input, epochs=10, run_with_test=False, 
             submission_results[(host, series)] = results_o
 
         if run_with_test:
-            result_loss, baseline_loss = run_test(test_data, models, n_input, min_values, max_values)
+            result_loss, baseline_loss = run_test(test_data, models, n_input, min_values, max_values, device)
             print("Result: {}".format(result_loss))
             print("Baseline Result: {}".format(baseline_loss))
 
