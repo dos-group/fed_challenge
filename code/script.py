@@ -55,7 +55,11 @@ def min_max_scale(data, min_values=None, max_values=None):
     denom[denom == 0] = 1  # Prevent division by 0
     scaled_data = target_min + nom / denom
 
-    const = data[0][0] if min_values[0] == max_values[0] else -1
+    if min_values[0] == max_values[0]:
+        const = data[0][0]
+        print("Constant value {} detected. Min value {} equals max value {}.".format(data[0][0], min_values[0], max_values[0]))
+    else:
+        const = -1
 
     return const, scaled_data, min_values, max_values
 
@@ -267,7 +271,7 @@ def run(index, n_forecast, chunk_size, n_input, epochs=10, run_with_test=False, 
             train_data = df.to_numpy()
             const, train_data, min_values, max_values = min_max_scale(train_data)
 
-        if const > -1:
+        if const == -1:
             models = train_models(train_data, n_input, offset_indices, device, epochs)
             if not run_with_test:
                 input_data = train_data[-n_input:]
