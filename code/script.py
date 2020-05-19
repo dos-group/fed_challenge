@@ -117,7 +117,7 @@ class Model(nn.Module):
 
         self.lin1 = nn.Linear(input_len, input_len * 2)
         #self.lin2 = nn.Linear(input_len * 2, input_len * 4)
-        #self.lin3 = nn.Linear(input_len * 4, input_len * 2)
+        self.lin3 = nn.Linear(input_len * 2, input_len * 2)
         self.lin4 = nn.Linear(input_len * 2, input_len)
         self.lin_out = nn.Linear(input_len, output_len)
 
@@ -125,7 +125,7 @@ class Model(nn.Module):
         o = x
         o = self.lin1(o)
         #o = self.lin2(o)
-        #o = self.lin3(o)
+        o = self.lin3(o)
         o = self.lin4(o)
         o = self.lin_out(o)
 
@@ -238,9 +238,10 @@ def run_test(test_data, models, n_input, min_values, max_values, device):
     return result_loss, baseline_loss
 
 
-def run(index, n_forecast, chunk_size, n_input, epochs=10, run_with_test=False, iteration_limit=-1, device='cpu'):
-    con = lite.connect('../data/series.db')
-    ids = pd.read_csv('../data/data_ids_{}.csv'.format(index))
+def run(data_dir, index, n_forecast, chunk_size, n_input, epochs=10, run_with_test=False,
+        iteration_limit=-1, device='cpu'):
+    con = lite.connect('{}/series.db'.format(data_dir))
+    ids = pd.read_csv('{}/data_ids_{}.csv'.format(data_dir, index))
     offset_indices = [(i - chunk_size, i) for i in range(0, n_forecast + 1, chunk_size)][1:]
     
     min_t, max_t = get_time_range(con)
@@ -288,12 +289,13 @@ def run(index, n_forecast, chunk_size, n_input, epochs=10, run_with_test=False, 
             
     if not run_with_test:
         submission_results_df = generate_submission_results(submission_results)
-        submission_results_df.to_csv('../data/submission_t_{}.csv'.format(index), index=False, header=False,
+        submission_results_df.to_csv('{}/submission_t_{}.csv'.format(data_dir, index), index=False, header=False,
                                      float_format='%.4f')
 
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument("-d", "--data", type=int, required=True, help="Base data directory.")
     parser.add_argument("-i", "--index", type=int, required=True, help="Index of data split.")
     parser.add_argument("--n_forecast", type=int, default=168, help="Number of values to forecast.")
     parser.add_argument("--n_input", type=int, default=336, help="Number of values to use as input.")
@@ -307,6 +309,7 @@ def main():
     parser.add_argument("--device", type=str, default='cpu', help="Device to run on.")  # cuda:0, cpu
     args = parser.parse_args()
 
+    data_dir = args.data
     index = args.index
     n_forecast = args.n_forecast
     n_input = args.n_input
@@ -316,7 +319,7 @@ def main():
     series_limit = args.series_limit
     device = args.device
 
-    run(index, n_forecast, chunk_size, n_input, epochs, test, series_limit, device)
+    run(data_dir, index, n_forecast, chunk_size, n_input, epochs, test, series_limit, device)
 
 
 if __name__ == "__main__":
