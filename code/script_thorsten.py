@@ -2,15 +2,14 @@ import pandas as pd
 import sqlite3 as lite
 import torch
 import torch.nn as nn
-import time
 from sklearn.metrics import r2_score
-import argparse
+import seaborn as sns; sns.set()
 
 
 def get_dataframe(db_connection, data_id, min_t, max_t):
     min_t = str(min_t)
     max_t = str(max_t)
-    test_query = 'select time_window, Mean from FedCSIS where ID="{}"'.format(data_id)
+    test_query = 'select time_window, Mean, Close from FedCSIS where ID="{}"'.format(data_id)
     query_df = pd.read_sql_query(test_query, db_connection)
     query_df['time_window'] = pd.to_datetime(query_df['time_window'], format='%Y-%m-%dT%H:%M:%SZ')
 
@@ -32,6 +31,16 @@ def interpolate(test_df):
     return test_df
 
 
+def scaling(df):
+    maximum = df['Mean'].max()
+    df['Mean'] = df['Mean'].apply(lambda x: (x/maximum)*100)
+    return df, maximum
+
+
+def scaling_inv(value, maximum):
+    return (value*maximum)/100
+
+
 # get train and test samples
 def get_samples(df):
     samples = []
@@ -40,14 +49,22 @@ def get_samples(df):
 
     df['last_week_mean'] = [df['Mean'][i - one_week] for i in range(len(df['Mean']))]
     df['last_2week_mean'] = [df['Mean'][i - two_weeks] for i in range(len(df['Mean']))]
-    df['last_week_hour_before_mean'] = [df['Mean'][i - one_week - 1] for i in range(len(df['Mean']))]
 
-    next_h_list = [df['Mean'][i - one_week + 1] for i in range(len(df['Mean']) - 1)]
-    next_h_list.append(df['Mean'][len(df['Mean']) - 1])
-    df['last_week_hour_after_mean'] = next_h_list
+    last_values_mean = [0 for i in range(one_week)]
+    last_values_close = [0 for i in range(one_week)]
+    last_value_mean = 0
+    last_value_close = 0
+    for i in range(len(df['Mean'])-one_week):
+        if i%one_week == 0:
+            last_value_mean = df['Mean'][i+one_week-1]
+            last_value_close = df['Close'][i+one_week-1]
+        last_values_mean.append(last_value_mean)
+        last_values_close.append(last_value_close)
+    df['last_value_of_week'] = last_values_mean
+    df['close_value'] = last_values_close
 
     for i in range(two_weeks, len(df)):
-        samples.append((df.values[i, 1:], df.values[i, 0:1]))
+        samples.append((df.values[i, 2:], df.values[i, 0:1]))
     return samples
 
 
@@ -58,14 +75,12 @@ def get_samples_for_submission(df):
 
     df['last_week_mean'] = [df['Mean'][i] for i in range(len(df['Mean']))]
     df['last_2week_mean'] = [df['Mean'][i - one_week] for i in range(len(df['Mean']))]
-    df['last_week_hour_before_mean'] = [df['Mean'][i - 1] for i in range(len(df['Mean']))]
 
-    next_h_list = [df['Mean'][i + 1] for i in range(len(df['Mean']) - 1)]
-    next_h_list.append(df['Mean'][len(df['Mean']) - 1])
-    df['last_week_hour_after_mean'] = next_h_list
+    df['last_value_of_week'] = df['Mean'][-1]
+    df['last_close_of_week'] = df['Close'][-1]
 
     for i in range(one_week, len(df)):
-        samples.append((df.values[i, 1:], df.values[i, 0:1]))
+        samples.append((df.values[i, 2:], df.values[i, 0:1]))
     return samples
 
 
@@ -91,8 +106,6 @@ class Model(nn.Module):
 
 
 def train_models(model, data_id_test, train_data, epochs, device):
-    start = time.time()
-
     prediction_series = data_id_test
     print('######### Training {} #########'.format(prediction_series))
 
@@ -110,29 +123,23 @@ def train_models(model, data_id_test, train_data, epochs, device):
             loss = loss_function(input=out, target=torch.tensor(y, dtype=torch.float).cuda(device))
             loss.backward()
             optimizer.step()
-            total_loss += loss.item()  # r2_score(b_labels.cpu().detach().numpy(), out.cpu().detach().numpy())
+            total_loss += loss.item()
 
         losses.append(round(total_loss, 6))
         print("Epoch {} loss: {:.6f}".format(e, total_loss / len(train_data)))
 
-    end = time.time()
-    print('========= Training took {:.2f} ========='.format(end - start))
     return losses
 
 
-def predict_data(model, test_data, device):
+def predict_data(model, test_data, device, m):
     predictions = []
-    ground_trouth = [float(y) for x, y in test_data]
 
     with torch.no_grad():
-
         for x, y in test_data:
             output = model(torch.tensor(x, dtype=torch.float).cuda(device))
-            predictions.append(float(output))
-
-    return ground_trouth, predictions, r2_score(y_true=ground_trouth, y_pred=predictions)
-
-
+            output = float(scaling_inv(output, m))
+            predictions.append(output)
+    return predictions
 
 
 def run(start=0, end=10000, epochs=6, device=0):
@@ -146,16 +153,20 @@ def run(start=0, end=10000, epochs=6, device=0):
     ids = [hosts[i] + "#" + metrics[i] for i in range(len(hosts))]
     ids = ids[start:end]
 
+    r2_total = 0
+
     submission_results = pd.DataFrame()
     for data_id_test in ids:
         # Series and host
         result = data_id_test.split("#")
 
-        train_df = get_dataframe(db_connection, data_id_test, '2019-12-03 00:00:00', '2020-02-20 10:00:00')  # first two weeks will be cut in get_samples
+        train_df = get_dataframe(db_connection, data_id_test, '2019-12-03 11:00:00', '2020-02-20 10:00:00')  # first two weeks will be cut in get_samples
+        train_df, _ = scaling(train_df)
         train_df = interpolate(train_df)
         train_data = get_samples(train_df)
 
-        test_df = get_dataframe(db_connection, data_id_test, '2020-02-06 11:00:00', '2020-02-20 10:00:00')  # first two weeks will be cut in get_samples
+        test_df = get_dataframe(db_connection, data_id_test, '2020-02-06 11:00:00', '2020-02-20 10:00:00')
+        test_df, maximum_predict = scaling(test_df)
         test_df = interpolate(test_df)
         test_data = get_samples_for_submission(test_df)
 
@@ -171,13 +182,24 @@ def run(start=0, end=10000, epochs=6, device=0):
             max_iter -= 1
 
         # test
-        ground_trouth, predictions, r2 = predict_data(model, test_data, device)
+        predictions = predict_data(model, test_data, device, maximum_predict)
+        ground_trouth_last_week = [float(scaling_inv(y, maximum_predict)) for x, y in test_data]
+
+        r2 = r2_score(y_true=ground_trouth_last_week, y_pred=predictions)
+
+        if r2 < -1.0:
+            print("R2 recalc: " + str(r2))
+            predictions = [float(scaling_inv(test_data[167][0][2], maximum_predict)) for i in range(168)]
+
+        r2 = r2_score(y_true=ground_trouth_last_week, y_pred=predictions)
+        r2_total += r2
 
         result.extend(predictions)
         submission_results = submission_results.append([result], ignore_index=True)
-        print(data_id_test + " R2: " + str(r2))
+        print(data_id_test + " R2 (if its the same like last week): " + str(r2))
 
     submission_results.to_csv("submission_thorsten_from{}_to{}.csv".format(start, end), header=False, index=False)
+    print("R2 AVG: " + str(r2_total/(end-start)))
 
 
 def main():
