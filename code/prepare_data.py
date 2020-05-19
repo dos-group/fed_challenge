@@ -34,17 +34,26 @@ def test(index):
     print(ids)
 
 
+def get_ids(path):
+    id_df = pd.read_csv(path, header=None, usecols=[0, 1])
+    id_df['ID'] = id_df[[0, 1]].apply(lambda x: '#'.join(x), axis=1)
+
+    return id_df['ID']
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--n_splits", type=int, default=20, help="Number of splits.")
 
     args = parser.parse_args()
 
-    con = lite.connect('../data/series.db')
+    # con = lite.connect('../data/series.db')
     # min_t, max_t = get_time_range(con)
 
-    ids_q = 'select distinct ID from FedCSIS'
-    ids = pd.read_sql_query(ids_q, con)
+    # ids_q = 'select distinct ID from FedCSIS'
+    # ids = pd.read_sql_query(ids_q, con)
+
+    ids = get_ids("../data/solution_template.csv")
 
     n_splits = args.n_splits
     splits = np.array_split(ids, n_splits)
@@ -58,7 +67,7 @@ def main():
         #     data_id = row.ID
         #     df = read_from_db(con, data_id, min_t, max_t)
         #     write_to_db(df, i)
-    con.close()
+    #con.close()
 
 
 if __name__ == "__main__":
