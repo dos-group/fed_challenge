@@ -173,7 +173,7 @@ def run(start=0, end=10000, epochs=6, device=0):
         # Series and host
         result = data_id_test.split("#")
 
-        train_df = get_dataframe(db_connection, data_id_test, '2019-12-03 11:00:00', '2020-02-13 10:00:00')  # first two weeks will be cut in get_samples
+        train_df = get_dataframe(db_connection, data_id_test, '2019-12-03 11:00:00', '2020-02-20 10:00:00')  # first two weeks will be cut in get_samples
         train_df, _ = scaling(train_df)
         train_df = interpolate(train_df)
         train_data = get_samples(train_df)
@@ -205,7 +205,6 @@ def run(start=0, end=10000, epochs=6, device=0):
         r2_last_week = r2_score(y_true=ground_trouth_last_week, y_pred=predictions)
         r2_baseline_last_week = r2_score(y_true=ground_trouth_last_week, y_pred=predictions_baseline_last_week)
 
-        print("R2: ")
         if r2_baseline_last_week > r2_last_week:
             predictions = predictions_baseline
 
@@ -218,11 +217,10 @@ def run(start=0, end=10000, epochs=6, device=0):
         result.extend(predictions)
         submission_results = submission_results.append([result], ignore_index=True)
         print(data_id_test + " R2 (from last week): " + str(r2))
-        print("R2 Baseline AVG: " + str(r2_baseline_total / (end - start)))
-
 
     submission_results.to_csv("submission_thorsten_from{}_to{}.csv".format(start, end), header=False, index=False)
     print("R2 AVG: " + str(r2_total / (end-start)))
+    print("R2 Baseline AVG: " + str(r2_baseline_total / (end - start)))
 
 
 def main():
