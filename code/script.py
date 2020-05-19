@@ -68,7 +68,7 @@ def inv_min_max_scale(data, min_values, max_values):
     target_min = 0
     target_max = 1
 
-    nom = (data - target_min) * (max_values - min_values)
+    nom = (data - target_min) * (max_values - min_values) + min_values
     denom = target_max - target_min
     # denom[denom == 0] = 1  # Prevent division by 0
     orig_data = target_min + nom / denom
