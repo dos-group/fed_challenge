@@ -195,6 +195,12 @@ def run(start=0, end=10000, epochs=6, device=0):
         test_df = interpolate(test_df)
         test_data = get_samples_for_submission(test_df)
 
+        lw_df = get_dataframe(db_connection, data_id_test, '2020-01-30 11:00:00', '2020-02-13 10:00:00')  # first two weeks will be cut in get_samples
+        lw_df = inject_baseline(test_df, v_baseline)
+        lw_df, maximum_predict_lw = scaling(test_df)
+        lw_df = interpolate(test_df)
+        lw_data = get_samples_for_submission(test_df)
+        
         # train
         model = Model(len(train_data[0][0]), len(train_data[0][1]))
         losses = train_models(model, data_id_test, train_data, epochs=epochs, device=device)
@@ -203,16 +209,18 @@ def run(start=0, end=10000, epochs=6, device=0):
         # test
         predictions = predict_data(model, test_data, device, maximum_predict)
         predictions_baseline = [v_baseline for i in range(168)]
+        predictions_lw = predict_data(model, lw_data, device, maximum_predict)
 
         ground_trouth_last_week = [float(scaling_inv(y, maximum_predict)) for x, y in test_data]
 
         predictions = [round(x, 4) for x in predictions]
+        predictions_lw = [round(x, 4) for x in predictions_lw]
         ground_trouth_last_week = [round(x, 4) for x in ground_trouth_last_week]
-        print(predictions_baseline)
-        print(predictions)
-        print(ground_trouth_last_week)
+        #print(predictions_baseline)
+        #print(predictions)
+        #print(ground_trouth_last_week)
 
-        r2_last_week = r2_score(y_true=ground_trouth_last_week, y_pred=predictions)
+        r2_last_week = r2_score(y_true=ground_trouth_last_week, y_pred=predictions_lw)
         r2_baseline_last_week = r2_score(y_true=ground_trouth_last_week, y_pred=predictions_baseline)
 
         print("R2 if it is similar to last week: " + str(r2_last_week) + " Real R2: " + " baseline last week " + str(r2_baseline_last_week))
