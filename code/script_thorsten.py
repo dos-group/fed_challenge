@@ -196,10 +196,10 @@ def run(start=0, end=10000, epochs=6, device=0):
         test_data = get_samples_for_submission(test_df)
 
         lw_df = get_dataframe(db_connection, data_id_test, '2020-01-30 11:00:00', '2020-02-13 10:00:00')  # first two weeks will be cut in get_samples
-        lw_df = inject_baseline(test_df, v_baseline)
-        lw_df, maximum_predict_lw = scaling(test_df)
-        lw_df = interpolate(test_df)
-        lw_data = get_samples_for_submission(test_df)
+        lw_df = inject_baseline(lw_df, v_baseline)
+        lw_df, maximum_predict_lw = scaling(lw_df)
+        lw_df = interpolate(lw_df)
+        lw_data = get_samples_for_submission(lw_df)
         
         # train
         model = Model(len(train_data[0][0]), len(train_data[0][1]))
