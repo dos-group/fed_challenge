@@ -209,7 +209,7 @@ def run(start=0, end=10000, epochs=6, device=0):
         # test
         predictions = predict_data(model, test_data, device, maximum_predict)
         predictions_baseline = [v_baseline for i in range(168)]
-        predictions_lw = predict_data(model, lw_data, device, maximum_predict)
+        predictions_lw = predict_data(model, lw_data, device, maximum_predict_lw)
 
         ground_trouth_last_week = [float(scaling_inv(y, maximum_predict)) for x, y in test_data]
 
