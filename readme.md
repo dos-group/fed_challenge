@@ -1,4 +1,8 @@
-This repository contains the code for the paper <link>.
+This repository contains the code for the paper
+<br>
+**Superiority of Simplicity: A Lightweight Model for 
+Network Device Workload Prediction**
+<br>
 
 ## Run the script
 Python 3.6 is required to run the script.
