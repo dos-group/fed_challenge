@@ -1,13 +1,16 @@
 ## Run the script
 Python 3.6 is required to run the script.
 To run the script simply do:
+<br>
 `python code/run.py`
-
+<br>
 All 10000 series will be predicted. This might take a while 
 (~40 hours on one Nvidia Titan GPU, will run forever on CPU). 
-
-`python code/run.py --start 0 --end 10`
+<br>
 Alternatively it is possible to predict a subset of series.
+<br>
+`python code/run.py --start 0 --end 10`
+<br>
 This can be used for testing or for parallelization by running
 this script several times and defining respective start and
 end indices.
