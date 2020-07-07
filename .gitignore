@@ -106,4 +106,4 @@ venv.bak/
 # mypy
 .mypy_cache/
 
-data/
+data/series.db
