@@ -1,7 +1,9 @@
-This repository contains the code for the paper
+This repository contains the code for the paper:
+<br>
 <br>
 **Superiority of Simplicity: A Lightweight Model for 
 Network Device Workload Prediction**
+<br>
 <br>
 
 ## Run the script
