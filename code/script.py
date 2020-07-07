@@ -126,7 +126,7 @@ class Model(nn.Module):
         o = self.lin1(o)
         #o = self.lin2(o)
         o = self.lin3(o)
-        o = self.lin4(o)
+        o = self.lin4(o)    
         o = self.lin_out(o)
 
         return o
