@@ -5,6 +5,9 @@ This repository contains the code for the paper:
 Network Device Workload Prediction**
 <br>
 <br>
+Preprint version @ [arxiv](https://arxiv.org/abs/2007.03568)
+<br>
+<br>
 
 ## Run the script
 Python 3.6 is required to run the script.
