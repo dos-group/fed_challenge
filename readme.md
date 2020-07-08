@@ -9,6 +9,13 @@ Preprint version @ [arxiv](https://arxiv.org/abs/2007.03568)
 <br>
 <br>
 
+## Data preparation
+First unpack the data/data.tar.gz archive.
+The contained training_series_long.csv must be located in the 
+data directory. 
+<br>
+<br>
+
 ## Run the script
 Python 3.6 is required to run the script.
 To run the script simply do:
